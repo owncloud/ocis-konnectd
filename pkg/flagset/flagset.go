@@ -232,10 +232,17 @@ func ServerWithConfig(cfg *config.Config) []cli.Flag {
 			Destination: &cfg.Konnectd.EndsessionEndpointURI,
 		},
 		&cli.StringFlag{
+			Name:        "asset-path",
+			Value:       "",
+			Usage:       "Path to custom assets",
+			EnvVar:      "KONNECTD_ASSET_PATH",
+			Destination: &cfg.Asset.Path,
+		},
+		&cli.StringFlag{
 			Name:        "identifier-client-path",
 			Usage:       "Path to the identifier web client base folder",
 			EnvVar:      "KONNECTD_IDENTIFIER_CLIENT_PATH",
-			Value:       "./identifier-webapp",
+			Value:       "./assets/identifier",
 			Destination: &cfg.Konnectd.IdentifierClientPath,
 		},
 		&cli.StringFlag{

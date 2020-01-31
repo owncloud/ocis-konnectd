@@ -1,14 +1,20 @@
 package svc
 
 import (
+	"bytes"
 	"context"
-	"github.com/go-chi/chi"
-	"github.com/gorilla/mux"
-	"github.com/owncloud/ocis-konnectd/pkg/config"
-	"github.com/owncloud/ocis-konnectd/pkg/log"
-	"github.com/rs/zerolog"
+	"io/ioutil"
 	"net/http"
 	"os"
+
+	"github.com/go-chi/chi"
+	"github.com/gorilla/mux"
+	"github.com/owncloud/ocis-konnectd/pkg/assets"
+	"github.com/owncloud/ocis-konnectd/pkg/config"
+	logw "github.com/owncloud/ocis-konnectd/pkg/log"
+	"github.com/owncloud/ocis-konnectd/pkg/middleware"
+	"github.com/owncloud/ocis-pkg/log"
+	"github.com/rs/zerolog"
 	"stash.kopano.io/kc/konnect/bootstrap"
 	kcconfig "stash.kopano.io/kc/konnect/config"
 	"stash.kopano.io/kc/konnect/server"
@@ -20,12 +26,6 @@ type Service interface {
 	Dummy(http.ResponseWriter, *http.Request)
 }
 
-// Konnectd defines implements the business logic for Service.
-type Konnectd struct {
-	config *config.Config
-	mux    http.Handler
-}
-
 // NewService returns a service implementation for Service.
 func NewService(opts ...Option) Service {
 	ctx := context.Background()
@@ -34,7 +34,7 @@ func NewService(opts ...Option) Service {
 	initKonnectInternalEnvVars(logger)
 
 	bs, err := bootstrap.Boot(ctx, &options.Config.Konnectd, &kcconfig.Config{
-		Logger: log.Wrap(logger),
+		Logger: logw.Wrap(logger),
 	})
 
 	if err != nil {
@@ -44,10 +44,14 @@ func NewService(opts ...Option) Service {
 	routes := []server.WithRoutes{bs.Managers.Must("identity").(server.WithRoutes)}
 	handlers := bs.Managers.Must("handler").(http.Handler)
 
-	return Konnectd{
+	svc := Konnectd{
+		logger: options.Logger,
 		config: options.Config,
-		mux:    newMux(ctx, routes, handlers, options.Middleware),
 	}
+
+	svc.initMux(ctx, routes, handlers, options)
+
+	return svc
 }
 
 // Init vars which are currently not accessible via konnectd api
@@ -75,8 +79,15 @@ func initKonnectInternalEnvVars(l zerolog.Logger) {
 	}
 }
 
-// newMux initializes the internal konnectd gorilla mux and mounts it in to a ocis chi-router
-func newMux(ctx context.Context, r []server.WithRoutes, h http.Handler, middleware []func(http.Handler) http.Handler) http.Handler {
+// Konnectd defines implements the business logic for Service.
+type Konnectd struct {
+	logger log.Logger
+	config *config.Config
+	mux    *chi.Mux
+}
+
+// initMux initializes the internal konnectd gorilla mux and mounts it in to a ocis chi-router
+func (k *Konnectd) initMux(ctx context.Context, r []server.WithRoutes, h http.Handler, options Options) {
 	gm := mux.NewRouter()
 	for _, route := range r {
 		route.AddRoutes(ctx, gm)
@@ -87,22 +98,63 @@ func newMux(ctx context.Context, r []server.WithRoutes, h http.Handler, middlewa
 		gm.NotFoundHandler = h
 	}
 
-	m := chi.NewMux()
-	m.Use(middleware...)
-	m.Mount("/", gm)
+	k.mux = chi.NewMux()
+	k.mux.Use(options.Middleware...)
 
-	return m
+	k.mux.Use(middleware.Static(
+		"/signin/v1/",
+		assets.New(
+			assets.Logger(options.Logger),
+			assets.Config(options.Config),
+		),
+	))
+
+	// handle / | index.html with a template that needs to have the BASE_PREFIX replaced
+	k.mux.Get("/signin/v1/identifier/index.html", k.Index())
+	k.mux.Get("/signin/v1/identifier/", k.Index())
+	k.mux.Mount("/", gm)
 }
 
 // ServeHTTP implements the Service interface.
-func (g Konnectd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	g.mux.ServeHTTP(w, r)
+func (k Konnectd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	k.mux.ServeHTTP(w, r)
 }
 
 // Dummy implements the Service interface.
-func (g Konnectd) Dummy(w http.ResponseWriter, r *http.Request) {
+func (k Konnectd) Dummy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 
 	w.Write([]byte(http.StatusText(http.StatusOK)))
+}
+
+// Index renders the static html with the
+func (k Konnectd) Index() http.HandlerFunc {
+
+	// load template
+
+	a := assets.New(
+		assets.Logger(k.logger),
+		assets.Config(k.config),
+	)
+
+	f, err := a.Open("/identifier/index.html")
+	if err != nil {
+		k.logger.Fatal().Err(err).Msg("Could not open index template")
+	}
+	template, err := ioutil.ReadAll(f)
+	if err != nil {
+		k.logger.Fatal().Err(err).Msg("Could not read index template")
+	}
+
+	// TODO add environment variable to make the path prefix configurable
+	pp := "/signin/v1"
+
+	indexHTML := bytes.Replace(template, []byte("__PATH_PREFIX__"), []byte(pp), 1)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(indexHTML)
+	})
+
 }
