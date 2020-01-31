@@ -16,6 +16,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/viper v1.6.1
 	go.opencensus.io v0.22.2
+	golang.org/x/net v0.0.0-20191207000613-e7e4b65ae663
 	stash.kopano.io/kc/konnect v0.28.0
 )
 
