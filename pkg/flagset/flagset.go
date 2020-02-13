@@ -161,7 +161,7 @@ func ServerWithConfig(cfg *config.Config) []cli.Flag {
 			Name:        "iss",
 			Usage:       "OIDC issuer URL",
 			EnvVars:     []string{"KONNECTD_ISS"},
-			Value:       "https://127.0.0.1:9130",
+			Value:       "https://localhost:9130",
 			Destination: &cfg.Konnectd.Iss,
 		},
 		&cli.StringSliceFlag{
