@@ -35,7 +35,6 @@ func Server(cfg *config.Config) *cli.Command {
 			}
 
 			// StringSliceFlag doesn't support Destination
-			// UPDATE Destination on string flags supported. Wait for https://github.com/urfave/cli/pull/1078 to get to micro/cli
 			if len(c.StringSlice("trusted-proxy")) > 0 {
 				cfg.Konnectd.TrustedProxy = c.StringSlice("trusted-proxy")
 			}
@@ -83,10 +82,6 @@ func Server(cfg *config.Config) *cli.Command {
 							ServiceName:       cfg.Tracing.Service,
 						},
 					)
-
-					logger.Info().
-						Str("collector", cfg.Tracing.Collector).
-						Msg("Trace collector added")
 
 					if err != nil {
 						logger.Error().
