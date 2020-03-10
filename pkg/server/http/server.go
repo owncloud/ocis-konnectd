@@ -70,11 +70,11 @@ func Server(opts ...Option) (http.Service, error) {
 			middleware.Logger(
 				options.Logger,
 			),
-			middleware.Trace,
 		),
 	)
 
 	{
+		handle = svc.NewTracing(handle)
 		handle = svc.NewInstrument(handle, options.Metrics)
 		handle = svc.NewLogging(handle, options.Logger)
 	}
