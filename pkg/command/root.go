@@ -33,7 +33,6 @@ func Execute() error {
 
 		Before: func(c *cli.Context) error {
 			ParseConfig(c, cfg)
-			Print(cfg.HTTP)
 			return nil
 		},
 
