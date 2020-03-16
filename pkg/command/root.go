@@ -32,44 +32,8 @@ func Execute() error {
 		Flags: flagset.RootWithConfig(cfg),
 
 		Before: func(c *cli.Context) error {
-			logger := NewLogger(cfg)
-
-			viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-			viper.SetEnvPrefix("KONNECTD")
-			viper.AutomaticEnv()
-
-			if c.IsSet("config-file") {
-				viper.SetConfigFile(c.String("config-file"))
-			} else {
-				viper.SetConfigName("konnectd")
-
-				viper.AddConfigPath("/etc/ocis")
-				viper.AddConfigPath("$HOME/.ocis")
-				viper.AddConfigPath("./config")
-			}
-
-			if err := viper.ReadInConfig(); err != nil {
-				switch err.(type) {
-				case viper.ConfigFileNotFoundError:
-					logger.Info().
-						Msg("Continue without config")
-				case viper.UnsupportedConfigError:
-					logger.Fatal().
-						Err(err).
-						Msg("Unsupported config type")
-				default:
-					logger.Fatal().
-						Err(err).
-						Msg("Failed to read config")
-				}
-			}
-
-			if err := viper.Unmarshal(&cfg); err != nil {
-				logger.Fatal().
-					Err(err).
-					Msg("Failed to parse config")
-			}
-
+			ParseConfig(c, cfg)
+			Print(cfg.HTTP)
 			return nil
 		},
 
@@ -100,4 +64,48 @@ func NewLogger(cfg *config.Config) log.Logger {
 		log.Pretty(cfg.Log.Pretty),
 		log.Color(cfg.Log.Color),
 	)
+}
+
+// ParseConfig load configuration for every extension
+// TODO: DRY this func, take Environment Prefix as parameter, as it is the only variable
+func ParseConfig(c *cli.Context, cfg *config.Config) error {
+	logger := NewLogger(cfg)
+
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvPrefix("KONNECTD")
+	viper.AutomaticEnv()
+
+	if c.IsSet("config-file") {
+		viper.SetConfigFile(c.String("config-file"))
+	} else {
+		viper.SetConfigName("konnectd")
+
+		viper.AddConfigPath("/etc/ocis")
+		viper.AddConfigPath("$HOME/.ocis")
+		viper.AddConfigPath("./config")
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		switch err.(type) {
+		case viper.ConfigFileNotFoundError:
+			logger.Info().
+				Msg("Continue without config")
+		case viper.UnsupportedConfigError:
+			logger.Fatal().
+				Err(err).
+				Msg("Unsupported config type")
+		default:
+			logger.Fatal().
+				Err(err).
+				Msg("Failed to read config")
+		}
+	}
+
+	if err := viper.Unmarshal(&cfg); err != nil {
+		logger.Fatal().
+			Err(err).
+			Msg("Failed to parse config")
+	}
+
+	return nil
 }
