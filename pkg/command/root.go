@@ -32,8 +32,7 @@ func Execute() error {
 		Flags: flagset.RootWithConfig(cfg),
 
 		Before: func(c *cli.Context) error {
-			ParseConfig(c, cfg)
-			return nil
+			return ParseConfig(c, cfg)
 		},
 
 		Commands: []*cli.Command{
@@ -66,7 +65,6 @@ func NewLogger(cfg *config.Config) log.Logger {
 }
 
 // ParseConfig load configuration for every extension
-// TODO: DRY this func, take Environment Prefix as parameter, as it is the only variable
 func ParseConfig(c *cli.Context, cfg *config.Config) error {
 	logger := NewLogger(cfg)
 
