@@ -5,4 +5,6 @@ geekdocEditPath: edit/master/docs
 geekdocFilePath: _index.md
 ---
 
-This service provides an OpenID Connect provider which is the default way to authenticate in OCIS.
+# Abstract
+
+OCIS needs to authenticate users. Without an identity, there is no ownership of files. `ocis-konnectd` wraps kopano konnectd to embed an OpenID Connect Identity Provider in the ocis single binary. It provides OpenID Connect based authentication out of the box or can be replaced with an existing IdP.
